@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FlowType — Precision Typing</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080a0e;
+    --bg2: #0f1117;
+    --bg3: #181c26;
+    --border: #232736;
+    --text: #e2e4ed;
+    --text2: #5a5f72;
+    --text3: #363a4a;
+    --accent: #4f8cff;
+    --accent-glow: rgba(79,140,255,0.15);
+    --correct: #3dd68c;
+    --error: #ff5572;
+    --error-bg: rgba(255,85,114,0.12);
+    --warning: #ffb547;
+    --card: #0f1117;
+    --radius: 16px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow blob */
+  body::after {
+    content: '';
+    position: fixed;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(79,140,255,0.06) 0%, transparent 70%);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ===== WRAPPER ===== */
+  .wrapper {
+    width: 100%; max-width: 860px;
+    position: relative; z-index: 1;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .logo {
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .mode-pills {
+    display: flex; gap: 0.4rem;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; font-weight: 500;
+    padding: 0.35rem 0.9rem;
+    border-radius: 100px;
+    border: none; cursor: pointer;
+    background: transparent;
+    color: var(--text2);
+    transition: all 0.2s; letter-spacing: 0.03em;
+  }
+  .pill:hover { color: var(--text); }
+  .pill.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+
+  /* ===== STATS BAR ===== */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+    transition: border-color 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+  }
+  .stat-card.active::before { transform: scaleX(1); }
+
+  .stat-value {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(1.4rem, 3.5vw, 2rem);
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1.1;
+    transition: color 0.3s;
+  }
+  .stat-value.correct { color: var(--correct); }
+  .stat-value.warn { color: var(--warning); }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text2);
+    margin-top: 0.3rem;
+    display: block;
+  }
+
+  /* ===== TYPING CARD ===== */
+  .typing-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    margin-bottom: 1rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    transition: border-color 0.3s;
+  }
+  .typing-card.focused { border-color: rgba(79,140,255,0.3); }
+
+  /* PROGRESS BAR */
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--correct));
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.2s ease;
+  }
+
+  /* TEXT DISPLAY */
+  #text-display {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(1rem, 2.5vw, 1.25rem);
+    line-height: 1.9;
+    color: var(--text3);
+    margin-bottom: 1.5rem;
+    user-select: none;
+    word-break: break-word;
+    min-height: 80px;
+    letter-spacing: 0.03em;
+  }
+
+  .char { transition: color 0.05s; }
+  .char-correct { color: var(--correct); }
+  .char-incorrect {
+    color: var(--error);
+    background: var(--error-bg);
+    border-radius: 2px;
+    text-decoration: underline;
+  }
+  .char-current {
+    color: var(--text);
+    position: relative;
+  }
+  .char-current::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* INPUT */
+  .input-wrap { position: relative; }
+  #input-field {
+    width: 100%;
+    background: var(--bg3);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem 0.9rem 3rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    color: var(--text);
+    outline: none;
+    transition: all 0.25s;
+    caret-color: var(--accent);
+  }
+  #input-field::placeholder { color: var(--text2); }
+  #input-field:focus {
+    border-color: var(--accent);
+    background: var(--bg2);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  #input-field:disabled {
+    opacity: 0.5; cursor: not-allowed;
+  }
+  .input-icon {
+    position: absolute; left: 1rem; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text2); font-size: 1rem;
+    pointer-events: none;
+  }
+
+  /* ===== FOOTER ROW ===== */
+  .footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .hint {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text2);
+    letter-spacing: 0.05em;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .kbd {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.1rem 0.4rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem;
+    color: var(--text2);
+  }
+
+  .btn-reset {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: transparent;
+    border: 1.5px solid var(--border);
+    color: var(--text2);
+    padding: 0.6rem 1.4rem;
+    border-radius: 8px; cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .btn-reset:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  .btn-reset svg { transition: transform 0.3s; }
+  .btn-reset:hover svg { transform: rotate(180deg); }
+
+  /* ===== RESULT MODAL ===== */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(8,10,14,0.85);
+    backdrop-filter: blur(12px);
+    display: none; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 100%; max-width: 480px;
+    padding: clamp(1.5rem, 5vw, 2.5rem);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.7);
+    animation: modalIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+  @keyframes modalIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  .modal-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--correct);
+    box-shadow: 0 0 8px var(--correct);
+    display: inline-block;
+  }
+
+  .modal-title {
+    font-size: clamp(1.6rem, 5vw, 2.2rem);
+    font-weight: 800; letter-spacing: -0.04em;
+    color: var(--text); margin-bottom: 0.25rem;
+  }
+  .modal-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem; color: var(--text2); margin-bottom: 2rem;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+  .result-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1rem;
+    text-align: center;
+  }
+  .result-item.highlight {
+    background: rgba(79,140,255,0.08);
+    border-color: rgba(79,140,255,0.3);
+  }
+  .result-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 600;
+    color: var(--accent); display: block; line-height: 1;
+    margin-bottom: 0.35rem;
+  }
+  .result-item.highlight .result-val { color: var(--correct); }
+  .result-lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem; text-transform: uppercase;
+    letter-spacing: 0.15em; color: var(--text2);
+  }
+
+  /* PERFORMANCE BAR */
+  .perf-bar { margin-bottom: 2rem; }
+  .perf-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 0.5rem; display: block;
+  }
+  .perf-track {
+    height: 8px; background: var(--bg3);
+    border-radius: 8px; overflow: hidden;
+  }
+  .perf-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--error), var(--warning) 50%, var(--correct));
+    border-radius: 8px;
+    transition: width 1s ease;
+  }
+
+  .modal-btns {
+    display: flex; gap: 0.75rem;
+  }
+  .btn-primary {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 10px;
+    padding: 0.9rem; cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px var(--accent-glow);
+  }
+  .btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn-secondary {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: transparent; color: var(--text2);
+    border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 0.9rem 1.2rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--text2); color: var(--text); }
+
+  /* ===== KEYBOARD HINT ===== */
+  .keyboard-row {
+    display: flex; justify-content: center; gap: 0.35rem;
+    margin-top: 2rem; flex-wrap: wrap;
+    opacity: 0.25; transition: opacity 0.3s;
+  }
+  .keyboard-row:hover { opacity: 0.5; }
+  .key {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.55rem;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    border-radius: 4px; padding: 0.3rem 0.5rem; color: var(--text2);
+    min-width: 28px; text-align: center;
+  }
+  .key.space { min-width: 80px; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 640px) {
+    body { padding: 1rem; justify-content: flex-start; padding-top: 2rem; }
+
+    .stats-bar {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .mode-pills { width: 100%; justify-content: center; }
+    .pill { flex: 1; text-align: center; font-size: 0.65rem; padding: 0.35rem 0.5rem; }
+
+    .typing-card { padding: 1.25rem; }
+
+    #text-display { font-size: 0.95rem; line-height: 1.8; }
+
+    .footer-row { flex-direction: column; align-items: stretch; }
+    .btn-reset { justify-content: center; }
+    .hint { justify-content: center; }
+
+    .result-grid { grid-template-columns: 1fr 1fr; }
+    .modal-btns { flex-direction: column; }
+
+    .keyboard-row { display: none; }
+  }
+
+  @media (max-width: 380px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .stat-value { font-size: 1.3rem; }
+    #text-display { font-size: 0.88rem; }
+  }
+
+  @media (min-width: 1200px) {
+    .wrapper { max-width: 960px; }
+    #text-display { font-size: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">Flow<span>Type</span></div>
+    <div class="mode-pills">
+      <button class="pill active" onclick="setMode('words', this)">Words</button>
+      <button class="pill" onclick="setMode('quotes', this)">Quotes</button>
+      <button class="pill" onclick="setMode('code', this)">Code</button>
+      <button class="pill" onclick="setMode('30s', this)">30s</button>
+      <button class="pill" onclick="setMode('60s', this)">60s</button>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-card" id="wpm-card">
+      <span class="stat-value" id="wpm">0</span>
+      <span class="stat-label">WPM</span>
+    </div>
+    <div class="stat-card" id="acc-card">
+      <span class="stat-value correct" id="accuracy">100%</span>
+      <span class="stat-label">Accuracy</span>
+    </div>
+    <div class="stat-card" id="timer-card">
+      <span class="stat-value" id="timer">—</span>
+      <span class="stat-label">Time</span>
+    </div>
+    <div class="stat-card" id="err-card">
+      <span class="stat-value warn" id="errors">0</span>
+      <span class="stat-label">Errors</span>
+    </div>
+  </div>
+
+  <!-- TYPING CARD -->
+  <div class="typing-card" id="typing-card">
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <div id="text-display">Loading...</div>
+
+    <div class="input-wrap">
+      <span class="input-icon">⌨</span>
+      <input type="text" id="input-field"
+        placeholder="Start typing to begin…"
+        autocomplete="off" autocorrect="off"
+        autocapitalize="off" spellcheck="false">
+    </div>
+  </div>
+
+  <!-- FOOTER ROW -->
+  <div class="footer-row">
+    <div class="hint">
+      <span class="kbd">Tab</span> or <span class="kbd">Ctrl+R</span> to restart
+    </div>
+    <button class="btn-reset" onclick="resetGame()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      New Test
+    </button>
+  </div>
+
+  <!-- DECORATIVE KEYBOARD -->
+  <div class="keyboard-row">
+    <div class="key">q</div><div class="key">w</div><div class="key">e</div>
+    <div class="key">r</div><div class="key">t</div><div class="key">y</div>
+    <div class="key">u</div><div class="key">i</div><div class="key">o</div>
+    <div class="key">p</div><div class="key space">space</div>
+    <div class="key">a</div><div class="key">s</div><div class="key">d</div>
+    <div class="key">f</div><div class="key">g</div>
+  </div>
+
+</div>
+
+<!-- RESULT MODAL -->
+<div class="modal-overlay" id="result-modal">
+  <div class="modal">
+    <div class="modal-badge"><span class="badge-dot"></span> Test Complete</div>
+    <h2 class="modal-title" id="modal-title">Great job!</h2>
+    <p class="modal-sub" id="modal-sub">Here's how you did</p>
+
+    <div class="result-grid">
+      <div class="result-item highlight">
+        <span class="result-val" id="res-wpm">0</span>
+        <span class="result-lbl">WPM</span>
+      </div>
+      <div class="result-item highlight">
+        <span class="result-val" id="res-acc">100%</span>
+        <span class="result-lbl">Accuracy</span>
+      </div>
+      <div class="result-item">
+        <span class="result-val" id="res-time">0s</span>
+        <span class="result-lbl">Time</span>
+      </div>
+      <div class="result-item">
+        <span class="result-val" id="res-errors">0</span>
+        <span class="result-lbl">Errors</span>
+      </div>
+    </div>
+
+    <div class="perf-bar">
+      <span class="perf-label">Accuracy Score</span>
+      <div class="perf-track">
+        <div class="perf-fill" id="perf-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn-primary" onclick="closeModal(); resetGame()">
+        Try Again →
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===================== DATA =====================
+  const data = {
+    words: [
+      "function returns array filtered by condition using higher order callbacks",
+      "clean code requires meaningful variable names and consistent formatting",
+      "async await simplifies promise chains into readable sequential code",
+      "the stack overflow error occurs when recursion lacks a base case",
+      "version control with git enables collaboration across distributed teams",
+      "responsive design adapts layout using media queries and flexible grids",
+      "binary search reduces time complexity from linear to logarithmic scale",
+    ],
+    quotes: [
+      "The best way to predict the future is to invent it. — Alan Kay",
+      "Any fool can write code that a computer can understand. Good programmers write code that humans can understand. — Martin Fowler",
+      "First, solve the problem. Then, write the code. — John Johnson",
+      "In theory, theory and practice are the same. In practice, they are not. — Yogi Berra",
+      "Code is like humor. When you have to explain it, it is bad. — Cory House",
+      "Simplicity is the soul of efficiency. — Austin Freeman",
+    ],
+    code: [
+      "const sum = (a, b) => a + b; console.log(sum(3, 7));",
+      "const arr = [1, 2, 3]; const doubled = arr.map(x => x * 2);",
+      "async function fetchData(url) { const res = await fetch(url); return res.json(); }",
+      "const obj = { name: 'FlowType', version: '1.0', active: true };",
+      "for (let i = 0; i < arr.length; i++) { if (arr[i] > 5) break; }",
+    ],
+    '30s': [
+      "speed matters but accuracy matters more type with intention not just velocity",
+      "every keystroke is a decision make them count and build your muscle memory",
+    ],
+    '60s': [
+      "the discipline of daily practice transforms average performance into excellence over time",
+      "typing fast is a skill learned through repetition patience and deliberate effort every day",
+    ],
+  };
+
+  // ===================== STATE =====================
+  let currentText = "";
+  let timerInterval = null;
+  let startTime = null;
+  let isRunning = false;
+  let currentMode = 'words';
+  let timeLimitMode = false;
+  let timeLimit = 0;
+  let totalErrors = 0;
+
+  // ===================== INIT =====================
+  function getRandomText() {
+    const pool = data[currentMode];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function init() {
+    currentText = getRandomText();
+    totalErrors = 0;
+
+    const display = document.getElementById('text-display');
+    display.innerHTML = '';
+    currentText.split('').forEach(char => {
+      const span = document.createElement('span');
+      span.className = 'char';
+      span.innerText = char;
+      display.appendChild(span);
+    });
+    if (display.children[0]) display.children[0].classList.add('char-current');
+
+    const input = document.getElementById('input-field');
+    input.value = '';
+    input.disabled = false;
+    input.focus();
+
+    clearInterval(timerInterval);
+    document.getElementById('wpm').textContent = '0';
+    document.getElementById('accuracy').textContent = '100%';
+    document.getElementById('timer').textContent = '—';
+    document.getElementById('errors').textContent = '0';
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('typing-card').classList.remove('focused');
+
+    isRunning = false;
+    startTime = null;
+
+    // Countdown mode
+    timeLimitMode = (currentMode === '30s' || currentMode === '60s');
+    timeLimit = currentMode === '30s' ? 30 : currentMode === '60s' ? 60 : 0;
+  }
+
+  // ===================== INPUT =====================
+  document.getElementById('input-field').addEventListener('focus', () => {
+    document.getElementById('typing-card').classList.add('focused');
+  });
+  document.getElementById('input-field').addEventListener('blur', () => {
+    document.getElementById('typing-card').classList.remove('focused');
+  });
+
+  document.getElementById('input-field').addEventListener('input', () => {
+    const inputVal = document.getElementById('input-field').value;
+    const spans = document.querySelectorAll('#text-display .char');
+
+    // Start timer on first keystroke
+    if (!isRunning && inputVal.length > 0) {
+      startTimer();
+      isRunning = true;
+    }
+
+    let errors = 0;
+    const inputChars = inputVal.split('');
+
+    spans.forEach((span, i) => {
+      const typed = inputChars[i];
+      span.className = 'char';
+
+      if (typed == null) {
+        if (i === inputVal.length) span.classList.add('char-current');
+      } else if (typed === span.innerText) {
+        span.classList.add('char-correct');
+      } else {
+        span.classList.add('char-incorrect');
+        errors++;
+      }
+    });
+
+    totalErrors = errors;
+    document.getElementById('errors').textContent = errors;
+
+    // Accuracy
+    if (inputVal.length > 0) {
+      const acc = Math.max(0, Math.floor(((inputVal.length - errors) / inputVal.length) * 100));
+      const accEl = document.getElementById('accuracy');
+      accEl.textContent = acc + '%';
+      accEl.className = 'stat-value' + (acc >= 95 ? ' correct' : acc >= 80 ? '' : ' warn');
+    }
+
+    // Progress bar
+    const progress = (inputVal.length / currentText.length) * 100;
+    document.getElementById('progress-fill').style.width = Math.min(100, progress) + '%';
+
+    // Finished
+    if (inputVal.length >= currentText.length) {
+      finishTest();
+    }
+  });
+
+  // ===================== TIMER =====================
+  function startTimer() {
+    startTime = Date.now();
+
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+      if (timeLimitMode) {
+        const remaining = timeLimit - elapsed;
+        document.getElementById('timer').textContent = remaining + 's';
+        if (remaining <= 0) finishTest();
+      } else {
+        document.getElementById('timer').textContent = elapsed + 's';
+      }
+
+      // Live WPM
+      const typedLen = document.getElementById('input-field').value.length;
+      const minutes = (Date.now() - startTime) / 60000;
+      const wpm = minutes > 0 ? Math.round((typedLen / 5) / minutes) : 0;
+      document.getElementById('wpm').textContent = wpm;
+    }, 500);
+  }
+
+  // ===================== FINISH =====================
+  function finishTest() {
+    clearInterval(timerInterval);
+    document.getElementById('input-field').disabled = true;
+
+    const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+    const typedLen = document.getElementById('input-field').value.length;
+    const minutes = elapsed / 60;
+    const finalWpm = minutes > 0 ? Math.round((typedLen / 5) / minutes) : 0;
+    const accEl = document.getElementById('accuracy');
+    const finalAcc = accEl.textContent;
+    const accNum = parseInt(finalAcc);
+
+    // Modal title
+    let title = 'Keep Practicing!';
+    if (finalWpm >= 80 && accNum >= 95) title = 'Blazing Fast! 🔥';
+    else if (finalWpm >= 60 && accNum >= 90) title = 'Great Typing! ✨';
+    else if (finalWpm >= 40) title = 'Solid Work! 👍';
+
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-sub').textContent = `Mode: ${currentMode} · ${currentText.length} characters`;
+    document.getElementById('res-wpm').textContent = finalWpm;
+    document.getElementById('res-acc').textContent = finalAcc;
+    document.getElementById('res-time').textContent = elapsed + 's';
+    document.getElementById('res-errors').textContent = totalErrors;
+
+    setTimeout(() => {
+      document.getElementById('perf-fill').style.width = accNum + '%';
+    }, 100);
+
+    setTimeout(() => {
+      document.getElementById('result-modal').classList.add('open');
+    }, 400);
+  }
+
+  function closeModal() {
+    document.getElementById('result-modal').classList.remove('open');
+  }
+
+  // ===================== RESET =====================
+  function resetGame() {
+    closeModal();
+    init();
+  }
+
+  // ===================== MODE =====================
+  function setMode(mode, btn) {
+    currentMode = mode;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    resetGame();
+  }
+
+  // ===================== KEYBOARD SHORTCUTS =====================
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') { e.preventDefault(); resetGame(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); resetGame(); }
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // Click outside modal to close
+  document.getElementById('result-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('result-modal')) closeModal();
+  });
+
+  // ===================== START =====================
+  window.onload = init;
+</script>
+</body>
+</html>
